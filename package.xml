@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>rossk</name>
+  <name>donkey_llc</name>
   <version>1.0.0</version>
   <description>ROS Donkeycar</description>
 
