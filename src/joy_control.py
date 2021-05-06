@@ -6,39 +6,47 @@ from sensor_msgs.msg import Joy
 
 class ServoConvert():
     """
-    Class for controlling the servos
+    Class for controlling the servos = convert an input to a servo value
     """
-    def __init__(self, id=1, center_value_throttle=333, center_value_steer=300, range=100, direction=1):
-        self.value = 0.0
+    def __init__(self, id=1, center_value_throttle=333, center_value_steer=300, range=100):
         self.id = id
         self._center_throttle = center_value_throttle
         self._center_steer = center_value_steer
         self._range = range
         self._half_range = 0.5 * range
-        self._dir = direction
 
     def get_value_out(self, value_in, type):
-        #--- value is in [-1, 1]
-        self.value = value_in
+        # value is in [-1, 1]
         if type == "steer":
-            self.value_out = int(self._dir*value_in*self._half_range + self._center_steer)
+            self.value_out = int(value_in * self._half_range + self._center_steer)
         else:
-            self.value_out = int(self._dir*value_in*self._half_range + self._center_throttle)
+            self.value_out = int(value_in * self._half_range + self._center_throttle)
         return(self.value_out)
 
 class ROSDonkey():
+    """
+    Clas for donkey car nodes
+    """
     def __init__(self):
-        rospy.loginfo("Setting Up the Node...")
 
-        rospy.init_node('dk_llc')
+        rospy.loginfo("Setting up Donkeycar Node...")
 
-        # Create actuator dictionary
+        rospy.init_node('donkeycar')
+
+        """
+        Create actuator dictionary
+        {
+            throttle: ServoConvert(id=1)
+            steer: ServoConvert(id=2)
+        }
+        """
         self.actuators = {}
         self.actuators['throttle'] = ServoConvert(id=1)
-        self.actuators['steering'] = ServoConvert(id=2, direction=1) #-- positive left
+        self.actuators['steering'] = ServoConvert(id=2)
         rospy.loginfo("> Actuators corrrectly initialized")
 
         # Create servo array
+        # 2 servos - 1 = Throttle | 2 = Steer
         self._servo_msg = ServoArray()
         for i in range(2): self._servo_msg.servos.append(Servo())
 
@@ -49,10 +57,6 @@ class ROSDonkey():
         # Create the Subscriber to Joystick commands
         self.ros_sub_twist = rospy.Subscriber("/joy", Joy, self.set_actuators_from_joystick)
         rospy.loginfo("> Subscriber corrrectly initialized")
-
-        #--- Get the last time e got a commands
-        self._last_time_cmd_rcv = time.time()
-        self._timeout_s = 5
 
         rospy.loginfo("Initialization complete")
 
@@ -70,8 +74,8 @@ class ROSDonkey():
         axes: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
               left stick         right stick
         """
-        #-- Save the time
-        self._last_time_cmd_rcv = time.time()
+
+        # Get the data from the message
         axes = message.axes
         steer_msg = axes[0]
         throttle_msg = axes[4]
@@ -99,21 +103,14 @@ class ROSDonkey():
 
         self.ros_pub_servo_array.publish(self._servo_msg)
 
-    @property
-    def is_controller_connected(self):
-        # print(time.time() - self._last_time_cmd_rcv)
-        return(time.time() - self._last_time_cmd_rcv < self._timeout_s)
-
     def run(self):
 
-        #--- Set the control rate
+        # Set the control rate
+        # Run the loop @ 10hz
         rate = rospy.Rate(10)
 
         while not rospy.is_shutdown():
-            # print(self._last_time_cmd_rcv, self.is_controller_connected)
-            if not self.is_controller_connected:
-                self.set_actuators_idle()
-
+            # Sleep until next cycle
             rate.sleep()
 
 if __name__ == "__main__":
